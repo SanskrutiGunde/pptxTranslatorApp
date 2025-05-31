@@ -3,105 +3,113 @@
 # Active Context: Audit Service
 
 ## Current Work Focus
-Starting implementation of the Audit Service microservice following domain-driven design with Gin framework, Zap logging, and Supabase REST API integration.
+**Testing Phase Milestone**: Implementing comprehensive test coverage (80%+), mock generation with Mockery, OpenAPI documentation with examples, and integration tests against local Supabase.
 
 ## Recent Changes
-- **Memory Bank Initialized**: Created dedicated memory bank for audit service
-- **Architecture Planned**: Domain-driven folder structure with clear separation of concerns
-- **Tech Stack Decided**: Go 1.21+, Gin, Zap, Viper, JWT validation, token caching
+- **Core Implementation Complete**: All components implemented (handlers, service, repository, middleware, JWT)
+- **Swag CLI Confirmed**: v1.16.4 installed and ready for OpenAPI generation
+- **Test Infrastructure**: Basic tests exist for domain, cache, handlers (60%+ coverage)
+- **Testing Phase Plan Approved**: Detailed 5-phase plan with 80% coverage target
 
 ## Next Steps
 
-### Immediate Tasks (Current Session)
-1. **Initialize Go Module**
-   - Create go.mod with dependencies
-   - Set up folder structure
+### **Phase 1: Mock Generation & Infrastructure** (Current Priority)
+1. **Mockery Setup**
+   - Create `.mockery.yaml` configuration file
+   - Generate mocks for AuditService, AuditRepository, TokenValidator interfaces
+   - Update Makefile with `generate-mocks` target
 
-2. **Core Domain Implementation**
-   - Define audit entry models
-   - Create error types
-   - Set up configuration structure
+2. **Test Helpers**
+   - Create `tests/helpers` package for shared utilities
+   - Add test fixtures and sample data
+   - Setup integration test database configuration
 
-3. **Supabase Client**
-   - REST API client with connection pooling
-   - Authentication headers
-   - Error handling
+### **Phase 2: Unit Tests Implementation**
+1. **Service Layer Tests** (`internal/service/audit_service_test.go`)
+   - Business logic with mocked repository
+   - Error scenarios (unauthorized, not found, service errors)
+   - Pagination logic and validation
 
-4. **JWT Validation**
-   - Local JWT secret validation
-   - Token parsing and claims extraction
-   - Expiry checking
+2. **Repository Layer Tests**
+   - `internal/repository/audit_repository_test.go`
+   - `internal/repository/supabase_client_test.go`
+   - Mock HTTP responses, query building, error handling
 
-5. **Token Cache**
-   - In-memory cache with TTL
-   - Cache interface for testing
-   - Hit/miss metrics
+3. **JWT Package Tests** (`pkg/jwt/validator_test.go`)
+   - JWT validation with sample tokens
+   - RSA key parsing, token expiry, claims extraction
 
-### Follow-up Tasks
-1. **Service & Repository Layers**
-   - Audit repository for Supabase queries
-   - Audit service with business logic
-   - Permission validation
+4. **Middleware Tests**
+   - All 4 middleware components with httptest
+   - Chain behavior and error scenarios
 
-2. **HTTP Handlers**
-   - GET /sessions/{sessionId}/history endpoint
-   - Request validation
-   - Response formatting
+### **Phase 3: OpenAPI Documentation**
+1. **Swagger Annotations**
+   - Add detailed annotations to handlers
+   - Include request/response examples
+   - Document security requirements
 
-3. **Middleware Stack**
-   - Request ID generation
-   - Structured logging
-   - Authentication
-   - Error handling
+2. **Build Integration**
+   - Integrate `swag init` into Makefile
+   - Generate docs before builds
+   - Serve at `/docs` endpoint
 
-4. **Testing**
-   - Unit tests with mocks
-   - Handler tests
-   - Integration test setup
+### **Phase 4: Integration Tests**
+1. **API Integration Tests** (`tests/integration/audit_api_test.go`)
+   - Test against local Supabase docker setup
+   - Complete authentication and API flow
+   - Real error scenarios
 
-5. **Docker & Documentation**
-   - Dockerfile for containerization
-   - docker-compose.yml
-   - OpenAPI documentation
-   - README with setup instructions
+### **Phase 5: Coverage & Quality**
+1. **80% Coverage Target**
+   - Generate coverage reports
+   - Fill coverage gaps
+   - Quality assurance
 
 ## Active Decisions & Considerations
 
-### Implementation Approach
-- Start with core domain models and work outward
-- Test-driven development where practical
-- Focus on clean, idiomatic Go code
-- Comprehensive error handling from the start
+### Testing Strategy
+- **Unit First**: Focus on unit tests before integration
+- **Mockery Generated**: Use proper mock interfaces vs manual mocks
+- **Table-Driven**: Comprehensive test scenarios with clear naming
+- **Local Supabase**: Integration tests against real docker instance
 
-### Performance Considerations
-- HTTP connection pooling configured early
-- Token caching to reduce auth overhead
-- Efficient JSON parsing
-- Minimal memory allocations
+### Mock Strategy
+- Interface-based mocking for service/repository layers
+- HTTP response mocking for external API calls
+- Testify/mock for behavior verification
+- Generated mocks for maintainability
 
-### Security Focus
-- Validate all inputs
-- Secure token handling
-- No sensitive data in logs
-- Proper error messages (no internal details)
+### Documentation Strategy
+- Detailed OpenAPI with examples and descriptions
+- Integrated into build process
+- Swagger UI at `/docs` endpoint
+- Validation step in CI/CD pipeline
 
 ## Current Blockers
-None - ready to begin implementation
+None - ready to begin Testing Phase implementation
 
-## Key Questions Resolved
-1. **Framework**: Gin chosen for familiarity and performance
-2. **Architecture**: Domain-driven design for maintainability
-3. **Data Access**: Supabase REST API (not direct SQL)
-4. **Caching**: In-memory with go-cache library
-5. **Testing**: Comprehensive unit tests with mocks
+## Technical Requirements Confirmed
+- **Coverage Target**: 80%+ overall (currently 60%+ for tested packages)
+- **Mock Generation**: Mockery CLI for proper interface mocks
+- **OpenAPI**: Full documentation with examples integrated in build
+- **Integration**: Local Supabase via docker-compose
+- **No Performance Testing**: Focus on functional correctness
 
-## Configuration Needed
-- Supabase URL and keys
-- JWT secret for validation
-- HTTP client timeouts
-- Cache TTL values
-- Log level settings
+## Configuration Status
+- Swag CLI: ✅ v1.16.4 installed
+- Local Environment: ✅ Ready
+- Supabase Docker: ✅ Available
+- Test Infrastructure: ⚠️ Needs mock generation setup
+
+## Deliverables Timeline
+- **Phase 1**: 30 minutes (mock setup)
+- **Phase 2**: 2-3 hours (unit tests)
+- **Phase 3**: 45 minutes (OpenAPI docs)
+- **Phase 4**: 1 hour (integration tests)
+- **Phase 5**: 30 minutes (coverage/quality)
+- **Total**: 4-5 hours
 
 ---
 
-*Last Updated: Audit Service Initialization* 
+*Last Updated: Testing Phase Milestone Plan Active* 

@@ -220,16 +220,183 @@ type Config struct {
 
 ## 8. Testing Patterns
 
-### Table-Driven Tests
+### 8.1 Mock Generation Strategy
+```yaml
+# .mockery.yaml
+with-expecter: true
+dir: "mocks"
+outpkg: "mocks"
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName | snakecase}}.go"
+interfaces:
+  AuditService:
+    config:
+      dir: "internal/service/mocks"
+  AuditRepository:
+    config:
+      dir: "internal/repository/mocks"
+  TokenValidator:
+    config:
+      dir: "pkg/jwt/mocks"
+```
+
+### 8.2 Unit Test Patterns
+
+#### Table-Driven Tests
 ```go
-func TestGetAuditLogs(t *testing.T) {
+func TestAuditService_GetAuditLogs(t *testing.T) {
     tests := []struct {
-        name      string
-        sessionID string
-        mockData  []AuditEntry
-        wantErr   error
+        name         string
+        sessionID    string
+        limit        int
+        offset       int
+        mockSetup    func(*mocks.MockAuditRepository)
+        expectedResp *domain.AuditResponse
+        expectedErr  error
+    }{
+        {
+            name:      "successful retrieval",
+            sessionID: "valid-session-id",
+            limit:     10,
+            offset:    0,
+            mockSetup: func(repo *mocks.MockAuditRepository) {
+                repo.EXPECT().FindBySessionID(
+                    mock.Anything, "valid-session-id", 10, 0,
+                ).Return(mockEntries, 25, nil)
+            },
+            expectedResp: &domain.AuditResponse{
+                TotalCount: 25,
+                Items:      mockEntries,
+            },
+            expectedErr: nil,
+        },
+        // Additional test cases...
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Test implementation with proper setup/teardown
+        })
+    }
+}
+```
+
+#### Mock Interface Usage
+```go
+type MockAuditRepository struct {
+    mock.Mock
+}
+
+func (m *MockAuditRepository) FindBySessionID(
+    ctx context.Context, 
+    sessionID string, 
+    limit, offset int,
+) ([]domain.AuditEntry, int, error) {
+    args := m.Called(ctx, sessionID, limit, offset)
+    return args.Get(0).([]domain.AuditEntry), args.Int(1), args.Error(2)
+}
+```
+
+### 8.3 HTTP Testing Patterns
+
+#### Handler Testing with httptest
+```go
+func TestAuditHandler_GetHistory(t *testing.T) {
+    gin.SetMode(gin.TestMode)
+    
+    tests := []struct {
+        name           string
+        sessionID      string
+        queryParams    string
+        mockSetup      func(*mocks.MockAuditService)
+        expectedStatus int
+        expectedBody   string
     }{
         // Test cases
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Setup mock service
+            mockService := mocks.NewMockAuditService(t)
+            tt.mockSetup(mockService)
+            
+            // Create handler and router
+            handler := handlers.NewAuditHandler(mockService, logger)
+            router := gin.New()
+            router.GET("/sessions/:sessionId/history", handler.GetHistory)
+            
+            // Create request and recorder
+            req := httptest.NewRequest("GET", 
+                fmt.Sprintf("/sessions/%s/history%s", tt.sessionID, tt.queryParams), 
+                nil)
+            w := httptest.NewRecorder()
+            
+            // Execute request
+            router.ServeHTTP(w, req)
+            
+            // Assertions
+            assert.Equal(t, tt.expectedStatus, w.Code)
+            assert.JSONEq(t, tt.expectedBody, w.Body.String())
+        })
+    }
+}
+```
+
+### 8.4 Integration Test Patterns
+
+#### Supabase Integration Setup
+```go
+func setupTestSupabase(t *testing.T) *repository.SupabaseClient {
+    config := &config.Config{
+        SupabaseURL:           "http://localhost:54321",
+        SupabaseServiceKey:    os.Getenv("TEST_SUPABASE_SERVICE_KEY"),
+        HTTPTimeout:           30 * time.Second,
+        HTTPMaxIdleConns:      10,
+        HTTPMaxConnsPerHost:   2,
+    }
+    
+    client, err := repository.NewSupabaseClient(config, logger)
+    require.NoError(t, err)
+    
+    // Verify connection
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    err = client.HealthCheck(ctx)
+    require.NoError(t, err, "Supabase connection failed")
+    
+    return client
+}
+```
+
+#### Complete API Flow Testing
+```go
+func TestAuditAPI_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration tests in short mode")
+    }
+    
+    // Setup test server with real dependencies
+    supabaseClient := setupTestSupabase(t)
+    tokenCache := cache.NewTokenCache(5*time.Minute, 1*time.Minute)
+    jwtValidator := jwt.NewValidator(testJWTSecret)
+    
+    repo := repository.NewAuditRepository(supabaseClient, logger)
+    service := service.NewAuditService(repo, logger)
+    handler := handlers.NewAuditHandler(service, logger)
+    
+    router := setupRouter(handler, jwtValidator, tokenCache, logger)
+    server := httptest.NewServer(router)
+    defer server.Close()
+    
+    tests := []struct {
+        name           string
+        setupData      func() (sessionID string, token string)
+        expectedStatus int
+        validateResp   func(t *testing.T, body []byte)
+    }{
+        // Integration test cases
     }
     
     for _, tt := range tests {
@@ -240,36 +407,74 @@ func TestGetAuditLogs(t *testing.T) {
 }
 ```
 
-### Mock Interfaces
+### 8.5 Test Utilities and Helpers
+
+#### Test Fixtures
 ```go
-type MockRepository struct {
-    mock.Mock
+// tests/helpers/fixtures.go
+package helpers
+
+func CreateTestAuditEntry(sessionID, userID string) domain.AuditEntry {
+    return domain.AuditEntry{
+        ID:        uuid.New(),
+        SessionID: sessionID,
+        UserID:    userID,
+        Action:    domain.ActionEdit,
+        Timestamp: time.Now(),
+        Details:   json.RawMessage(`{"field": "content", "old": "old", "new": "new"}`),
+    }
 }
 
-func (m *MockRepository) FindBySessionID(ctx context.Context, sessionID string, limit, offset int) ([]AuditEntry, int, error) {
-    args := m.Called(ctx, sessionID, limit, offset)
-    return args.Get(0).([]AuditEntry), args.Int(1), args.Error(2)
+func CreateTestJWT(userID string, sessionID string, secret []byte) string {
+    claims := jwt.MapClaims{
+        "sub": userID,
+        "exp": time.Now().Add(time.Hour).Unix(),
+        "iat": time.Now().Unix(),
+        "aud": "authenticated",
+        "iss": "supabase",
+    }
+    
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    tokenString, _ := token.SignedString(secret)
+    return tokenString
 }
 ```
 
-## 9. Performance Patterns
+### 8.6 Coverage and Quality Patterns
 
-### Connection Pooling
-```go
-httpClient := &http.Client{
-    Timeout: config.HTTPTimeout,
-    Transport: &http.Transport{
-        MaxIdleConns:        config.HTTPMaxIdleConns,
-        MaxIdleConnsPerHost: config.HTTPMaxConnsPerHost,
-        IdleConnTimeout:     90 * time.Second,
-    },
-}
+#### Coverage Configuration
+```makefile
+# Makefile targets for testing
+test:
+	go test ./... -v
+
+test-coverage:
+	go test ./... -v -coverprofile=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+
+test-coverage-report:
+	go test ./... -v -coverprofile=coverage.out
+	go tool cover -func=coverage.out
+	@echo "Coverage threshold: 80%"
+
+test-integration:
+	go test ./tests/integration/... -v -tags=integration
+
+test-all: test test-integration
 ```
 
-### Context Deadlines
+#### Quality Gates
 ```go
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+// TestCoverageThreshold ensures minimum coverage
+func TestCoverageThreshold(t *testing.T) {
+    cmd := exec.Command("go", "test", "./...", "-coverprofile=coverage.out")
+    err := cmd.Run()
+    require.NoError(t, err)
+    
+    coverage := parseCoverageOutput("coverage.out")
+    assert.GreaterOrEqual(t, coverage, 80.0, 
+        "Test coverage below threshold: %.2f%% < 80%%", coverage)
+}
 ```
 
 --- 

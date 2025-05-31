@@ -234,22 +234,204 @@ GET /rest/v1/session_shares?token=eq.{token}
 
 ## 7. Testing Strategy
 
-### 7.1 Unit Tests
-- Minimum 80% code coverage
-- Mock all external dependencies
-- Table-driven test approach
-- Parallel test execution
+### 7.1 Testing Phase Architecture
+```
+Testing Phase (Current Milestone)
+├── Phase 1: Mock Generation & Infrastructure
+│   ├── Mockery CLI setup (.mockery.yaml)
+│   ├── Generated mocks for interfaces
+│   └── Test helpers and fixtures
+├── Phase 2: Unit Tests (80% coverage target)
+│   ├── Service layer tests
+│   ├── Repository layer tests  
+│   ├── JWT package tests
+│   └── Middleware tests
+├── Phase 3: OpenAPI Documentation
+│   ├── Swagger annotations
+│   ├── Build integration
+│   └── Documentation serving
+├── Phase 4: Integration Tests
+│   ├── Local Supabase testing
+│   ├── Complete API flow tests
+│   └── Authentication scenarios
+└── Phase 5: Coverage & Quality
+    ├── Coverage reporting
+    ├── Gap analysis
+    └── Quality gates
+```
 
-### 7.2 Integration Tests
-- Test against local Supabase
-- End-to-end API tests
-- Authentication flow tests
-- Error scenario coverage
+### 7.2 Mock Generation Strategy
+```yaml
+# .mockery.yaml configuration
+with-expecter: true
+dir: "mocks"
+outpkg: "mocks"
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName | snakecase}}.go"
+interfaces:
+  AuditService:
+    config:
+      dir: "internal/service/mocks"
+  AuditRepository:
+    config:
+      dir: "internal/repository/mocks"
+  TokenValidator:
+    config:
+      dir: "pkg/jwt/mocks"
+```
 
-### 7.3 Load Testing
-```bash
-# Using k6 (future)
-k6 run --vus 100 --duration 30s load-test.js
+### 7.3 Unit Testing Approach
+- **Coverage Target**: 80%+ overall
+- **Pattern**: Table-driven tests with comprehensive scenarios
+- **Mocking**: Generated mocks via Mockery CLI
+- **Assertions**: Testify library for clean assertions
+- **Parallel Execution**: Safe for independent unit tests
+
+#### Test File Structure
+```
+internal/
+├── service/
+│   ├── audit_service.go
+│   ├── audit_service_test.go    # Business logic tests
+│   └── mocks/
+│       └── mock_audit_repository.go
+├── repository/
+│   ├── audit_repository.go
+│   ├── audit_repository_test.go  # Data access tests
+│   ├── supabase_client.go
+│   └── supabase_client_test.go   # HTTP client tests
+└── middleware/
+    ├── auth.go
+    ├── auth_test.go              # Auth middleware tests
+    ├── logger_test.go
+    ├── request_id_test.go
+    └── error_handler_test.go
+```
+
+### 7.4 Integration Testing Strategy
+```go
+// Integration test configuration
+type IntegrationTestConfig struct {
+    SupabaseURL        string
+    SupabaseServiceKey string
+    TestTimeout        time.Duration
+    SetupRetries       int
+}
+
+// Test tags for conditional execution
+// +build integration
+```
+
+#### Local Supabase Setup
+- **Docker Compose**: Local Supabase instance via docker
+- **Test Data**: Isolated test schemas and sample data
+- **Authentication**: Real JWT tokens for auth flow testing
+- **Cleanup**: Automated test data cleanup between tests
+
+### 7.5 OpenAPI Documentation Integration
+```go
+// Swagger annotations example
+// @Summary Get audit history
+// @Description Retrieve paginated audit log entries for a session
+// @Tags audit
+// @Accept json
+// @Produce json
+// @Param sessionId path string true "Session ID"
+// @Param limit query int false "Number of entries per page" default(10) maximum(100)
+// @Param offset query int false "Number of entries to skip" default(0)
+// @Security BearerAuth
+// @Security ShareToken
+// @Success 200 {object} domain.AuditResponse
+// @Failure 401 {object} domain.APIError
+// @Failure 403 {object} domain.APIError
+// @Failure 404 {object} domain.APIError
+// @Router /sessions/{sessionId}/history [get]
+```
+
+#### Documentation Build Process
+```makefile
+# Makefile integration
+docs:
+	swag init -g cmd/server/main.go -o docs/
+	@echo "OpenAPI documentation generated in docs/"
+
+docs-serve:
+	swagger-ui-server -p 8080 -d docs/
+
+build: docs
+	go build -o bin/audit-service cmd/server/main.go
+```
+
+### 7.6 Test Execution & Coverage
+
+#### Makefile Testing Targets
+```makefile
+# Testing commands
+test:
+	go test ./... -v
+
+test-unit:
+	go test ./... -v -short
+
+test-integration:
+	go test ./tests/integration/... -v -tags=integration
+
+test-coverage:
+	go test ./... -v -coverprofile=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	go tool cover -func=coverage.out
+
+test-coverage-check:
+	go test ./... -v -coverprofile=coverage.out
+	@go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//' | \
+	  awk '{if ($$1 < 80) {print "Coverage " $$1 "% is below 80% threshold"; exit 1} else {print "Coverage " $$1 "% meets 80% threshold"}}'
+
+generate-mocks:
+	mockery --config .mockery.yaml
+
+test-all: generate-mocks test-unit test-integration test-coverage-check
+```
+
+#### CI/CD Integration (Future)
+```yaml
+# GitHub Actions example
+- name: Run tests with coverage
+  run: make test-coverage-check
+  
+- name: Upload coverage reports
+  uses: codecov/codecov-action@v3
+  with:
+    file: ./coverage.out
+```
+
+### 7.7 Quality Gates and Metrics
+
+#### Coverage Requirements
+- **Overall**: 80%+ across all packages
+- **Critical Paths**: 95%+ for service and repository layers
+- **Error Scenarios**: 100% error path coverage
+- **Integration**: Complete happy path and auth flow coverage
+
+#### Test Quality Standards
+- **Naming**: Descriptive test names following `TestFunction_Scenario` pattern
+- **Setup/Teardown**: Proper test isolation and cleanup
+- **Assertions**: Clear, specific assertions with helpful error messages
+- **Documentation**: Test cases document expected behavior
+- **Performance**: Tests complete within reasonable timeframes
+
+### 7.8 Testing Tools and Dependencies
+```go
+// Testing dependencies in go.mod
+require (
+    github.com/stretchr/testify v1.8.4
+    github.com/gin-gonic/gin v1.9.1
+    github.com/golang/mock v1.6.0
+    // Mockery generated mocks
+)
+
+// Development tools
+// go install github.com/vektra/mockery/v2@latest
+// go install github.com/swaggo/swag/cmd/swag@latest
 ```
 
 --- 

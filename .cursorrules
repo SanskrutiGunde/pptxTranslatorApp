@@ -1,0 +1,162 @@
+# PowerPoint Translator App - Cursor Intelligence
+
+## Project Overview
+This is a web-based PowerPoint translation tool built with Next.js 14, Supabase, and pptxgenjs. The app enables collaborative translation of PPTX presentations while preserving original styling and layout.
+
+## Critical Implementation Paths
+
+### Authentication Flow
+- Use Supabase Auth for owner authentication (email/password)
+- Share links use token-based authentication stored in `session_shares` table
+- Reviewers don't need full accounts - just a valid share token
+
+### PPTX Processing
+- All PPTX parsing happens client-side using pptxgenjs
+- Raw PPTX files stored in Supabase Storage bucket: `raw-pptx`
+- Slide metadata extracted to JSON and stored in `sessions.metadata` (JSONB)
+- Export can be client-side (pptxgenjs) or server-side (Python ExportService)
+
+### State Management Pattern
+- Use Zustand stores organized by domain:
+  - `sessionStore`: Current session, role, share token
+  - `slideStore`: Slide metadata, edit buffers, merge selections
+  - `commentStore`: Comments cache per shape/run
+  - `notificationStore`: Real-time notification counts
+
+### Microservice Communication
+- Frontend calls microservices directly via fetch/axios
+- All microservices use Supabase service role key for DB access
+- Audit logging happens automatically on all state changes
+
+## User Preferences & Workflow
+
+### Development Approach
+- Rapid prototyping with v0.dev and Cursor AI
+- No CI/CD initially - local development only
+- Desktop-first design, no strict accessibility requirements
+- Single developer focus
+
+### Code Style
+- TypeScript for all frontend and Node.js code
+- Strict type checking enabled
+- Use shadcn/ui components for consistent UI
+- Tailwind CSS for styling (no custom CSS files)
+
+### Component Structure
+```
+/components
+  /ui          → shadcn/ui primitives
+  /session     → Session-related components
+  /slide       → Slide rendering and editing
+  /comments    → Comment threads and forms
+  /shared      → Reusable components
+```
+
+## Project-Specific Patterns
+
+### File Naming
+- Components: PascalCase (e.g., `SlideCanvas.tsx`)
+- Hooks: camelCase with 'use' prefix (e.g., `useSessionStore.ts`)
+- Services: PascalCase with 'Service' suffix (e.g., `SessionService.ts`)
+- Utils: camelCase (e.g., `pptxHelpers.ts`)
+
+### API Response Format
+```typescript
+interface ApiResponse<T> {
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+```
+
+### Audit Log Pattern
+Every state change must create an audit entry:
+```typescript
+{
+  sessionId: string;
+  userId: string;
+  action: 'edit' | 'merge' | 'order' | 'comment' | 'export';
+  timestamp: string;
+  details: object; // Action-specific data
+}
+```
+
+## Known Challenges
+
+### PPTX Complexity
+- Text runs can be split arbitrarily by PowerPoint
+- Preserve exact formatting when merging runs
+- Handle various shape types (text boxes, tables, smart art)
+
+### Real-time Sync
+- Use Supabase Realtime for comments and audit logs only
+- Don't sync slide edits in real-time (last write wins)
+- Notification badges update via subscription
+
+### Performance Considerations
+- Large PPTX files (>10MB) may slow client-side parsing
+- Limit slide thumbnail generation to visible slides
+- Use virtualization for long comment threads
+
+## Evolution of Decisions
+
+### Initial (v0.1)
+- Client-side only PPTX handling
+- Basic role separation (owner/reviewer)
+- Single language translation
+
+### Future Considerations
+- Server-side PPTX processing for large files
+- Multi-language support with language detection
+- Granular permissions per reviewer
+- Version control for translations
+
+## Tool Usage Patterns
+
+### Supabase CLI
+```bash
+supabase start        # Start local development
+supabase db push      # Apply migrations
+supabase gen types    # Generate TypeScript types
+```
+
+### Development Commands
+```bash
+npm run dev           # Start Next.js dev server
+npm run build         # Production build
+npm run lint          # Run ESLint
+```
+
+### Git Workflow
+- Feature branches off main
+- Commit message format: `type: description`
+- Types: feat, fix, docs, style, refactor, test, chore
+
+## Memory Bank Usage
+Always read ALL memory bank files when starting a new session:
+1. `projectbrief.md` - Core requirements
+2. `productContext.md` - Why and problems
+3. `systemPatterns.md` - Architecture
+4. `techContext.md` - Technologies
+5. `activeContext.md` - Current focus
+6. `progress.md` - Implementation status
+
+Update memory bank after significant changes or discoveries.
+
+## Performance Optimizations
+- Lazy load pptxgenjs library
+- Use React.memo for slide components
+- Debounce text editing saves
+- Cache parsed slide metadata in Zustand
+
+## Security Considerations
+- Validate share tokens server-side
+- Use RLS policies for all Supabase tables
+- Sanitize file uploads (PPTX only)
+- Rate limit API endpoints
+
+---
+
+*This file grows as we discover new patterns and make decisions together.* 

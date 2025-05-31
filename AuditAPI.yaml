@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: AuditService API
+  version: 1.0.0
+  description: |
+    AuditService provides endpoints to fetch the audit log (history) for a translation session.
+servers:
+  - url: https://api.yourdomain.com/auditservice
+    description: AuditService base URL
+
+paths:
+  /sessions/{sessionId}/history:
+    get:
+      summary: Retrieve audit log entries for a given session
+      description: |
+        Returns a chronological list of audit entries (edits, merges, reorders, comments, exports)
+        associated with the specified translation session. Only session owners or valid share-token holders may access.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: UUID of the translation session
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+          description: Maximum number of audit entries to return (pagination)
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Offset for pagination
+      responses:
+        '200':
+          description: A list of audit log entries ordered by timestamp descending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCount:
+                    type: integer
+                    description: Total number of audit entries for this session
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEntry'
+        '401':
+          description: Unauthorized – invalid or missing JWT/share token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden – user does not have permission to view this session’s audit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the audit entry
+        sessionId:
+          type: string
+          format: uuid
+          description: UUID of the session to which this audit entry belongs
+        userId:
+          type: string
+          format: uuid
+          description: UUID of the user who performed the action
+        action:
+          type: string
+          description: |
+            Type of action performed. One of:
+            - edit         (text run edited)
+            - merge        (runs merged)
+            - order        (reading order changed)
+            - comment      (comment added)
+            - export       (session exported)
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the action occurred
+        details:
+          type: object
+          description: JSON object containing action-specific details
+          example:
+            shapeId: "shape-123"
+            paragraphIdx: 0
+            runIdx: 1
+            oldText: "Original text"
+            newText: "Translated text"
+      required:
+        - id
+        - sessionId
+        - userId
+        - action
+        - timestamp
+        - details
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Short error code or message
+        message:
+          type: string
+          description: Detailed error explanation
+      required:
+        - error
+        - message

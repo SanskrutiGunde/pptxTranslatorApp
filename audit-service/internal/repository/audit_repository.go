@@ -20,12 +20,12 @@ type AuditRepository interface {
 
 // auditRepository implements the AuditRepository interface
 type auditRepository struct {
-	client *SupabaseClient
+	client SupabaseClientInterface
 	logger *zap.Logger
 }
 
 // NewAuditRepository creates a new audit repository instance
-func NewAuditRepository(client *SupabaseClient, logger *zap.Logger) AuditRepository {
+func NewAuditRepository(client SupabaseClientInterface, logger *zap.Logger) AuditRepository {
 	return &auditRepository{
 		client: client,
 		logger: logger,

@@ -14,6 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// SupabaseClientInterface defines the interface for Supabase client operations
+type SupabaseClientInterface interface {
+	Get(ctx context.Context, endpoint string, queryParams map[string]string) ([]byte, int, error)
+	Post(ctx context.Context, endpoint string, payload interface{}) ([]byte, error)
+}
+
 // SupabaseClient handles communication with Supabase REST API
 type SupabaseClient struct {
 	baseURL    string

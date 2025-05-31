@@ -13,33 +13,39 @@ import (
 // Claims represents the JWT claims we care about
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID string `json:"sub"`
+	UserID string // UserID is populated from Subject claim
 }
 
-// TokenValidator validates JWT tokens
-type TokenValidator struct {
+// TokenValidator defines the interface for JWT token validation
+type TokenValidator interface {
+	ValidateToken(ctx context.Context, tokenString string) (*Claims, error)
+	ExtractUserID(ctx context.Context, tokenString string) (string, error)
+}
+
+// tokenValidator implements the TokenValidator interface
+type tokenValidator struct {
 	verifyKey *rsa.PublicKey
 }
 
 // NewTokenValidator creates a new JWT token validator
-func NewTokenValidator(jwtSecret string) (*TokenValidator, error) {
+func NewTokenValidator(jwtSecret string) (TokenValidator, error) {
 	// Parse the RSA public key from the JWT secret
 	verifyKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(jwtSecret))
 	if err != nil {
 		// If RSA parsing fails, try as HMAC secret for backward compatibility
 		// In production, Supabase uses RS256
-		return &TokenValidator{
+		return &tokenValidator{
 			verifyKey: nil,
 		}, nil
 	}
-	
-	return &TokenValidator{
+
+	return &tokenValidator{
 		verifyKey: verifyKey,
 	}, nil
 }
 
 // ValidateToken validates a JWT token and returns the claims
-func (v *TokenValidator) ValidateToken(ctx context.Context, tokenString string) (*Claims, error) {
+func (v *tokenValidator) ValidateToken(ctx context.Context, tokenString string) (*Claims, error) {
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Verify the signing algorithm
@@ -95,16 +101,16 @@ func (v *TokenValidator) ValidateToken(ctx context.Context, tokenString string) 
 }
 
 // ExtractUserID is a convenience method to get just the user ID
-func (v *TokenValidator) ExtractUserID(ctx context.Context, tokenString string) (string, error) {
+func (v *tokenValidator) ExtractUserID(ctx context.Context, tokenString string) (string, error) {
 	claims, err := v.ValidateToken(ctx, tokenString)
 	if err != nil {
 		return "", err
 	}
-	
+
 	if claims.UserID == "" {
 		return "", errors.New("no user ID in token")
 	}
-	
+
 	return claims.UserID, nil
 }
 

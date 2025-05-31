@@ -1,4 +1,4 @@
-.PHONY: help build run test test-coverage lint clean docker-build docker-run docs
+.PHONY: help build run test test-coverage lint clean docker-build docker-run docs generate-mocks
 
 # Variables
 BINARY_NAME=audit-service
@@ -16,6 +16,7 @@ help:
 	@echo "  make test-coverage - Run tests with coverage"
 	@echo "  make lint          - Run linter"
 	@echo "  make docs          - Generate OpenAPI documentation"
+	@echo "  make generate-mocks - Generate mocks for testing"
 	@echo "  make docker-build  - Build Docker image"
 	@echo "  make docker-run    - Run in Docker"
 	@echo "  make clean         - Clean build artifacts"
@@ -52,6 +53,12 @@ docs:
 	@echo "Generating OpenAPI documentation..."
 	swag init -g cmd/server/main.go -o docs
 
+# Generate mocks for testing
+generate-mocks:
+	@echo "Generating mocks..."
+	mockery --all
+	@echo "Mocks generated successfully"
+
 # Build Docker image
 docker-build:
 	@echo "Building Docker image..."
@@ -67,4 +74,5 @@ clean:
 	@echo "Cleaning..."
 	rm -rf bin/
 	rm -f coverage.out coverage.html
-	rm -rf docs/ 
+	rm -rf docs/
+	rm -rf mocks/ 

@@ -22,7 +22,7 @@ const (
 )
 
 // Auth middleware validates JWT tokens or share tokens
-func Auth(validator *jwt.TokenValidator, tokenCache *cache.TokenCache, repo repository.AuditRepository, logger *zap.Logger) gin.HandlerFunc {
+func Auth(validator jwt.TokenValidator, tokenCache *cache.TokenCache, repo repository.AuditRepository, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := GetRequestID(c)
 
@@ -96,7 +96,7 @@ func extractBearerToken(authHeader string) string {
 }
 
 // validateJWTToken validates a JWT token and caches the result
-func validateJWTToken(c *gin.Context, token string, validator *jwt.TokenValidator, tokenCache *cache.TokenCache, logger *zap.Logger) bool {
+func validateJWTToken(c *gin.Context, token string, validator jwt.TokenValidator, tokenCache *cache.TokenCache, logger *zap.Logger) bool {
 	requestID := GetRequestID(c)
 
 	// Check cache first

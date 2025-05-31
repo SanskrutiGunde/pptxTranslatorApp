@@ -106,7 +106,7 @@ func main() {
 
 func setupRouter(
 	cfg *config.Config,
-	tokenValidator *jwt.TokenValidator,
+	tokenValidator jwt.TokenValidator,
 	tokenCache *cache.TokenCache,
 	auditRepo repository.AuditRepository,
 	auditHandler *handlers.AuditHandler,

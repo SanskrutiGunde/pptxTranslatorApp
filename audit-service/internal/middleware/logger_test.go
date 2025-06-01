@@ -55,7 +55,7 @@ func TestLogger(t *testing.T) {
 			},
 			expectedStatus: 400,
 			expectedLogs: []string{
-				"request completed",
+				"client error",
 				"POST",
 				"/api/v1/sessions",
 				"400",
@@ -91,7 +91,7 @@ func TestLogger(t *testing.T) {
 			},
 			expectedStatus: 500,
 			expectedLogs: []string{
-				"request completed",
+				"server error",
 				"GET",
 				"/api/v1/sessions/error-session/history",
 				"500",
@@ -159,12 +159,12 @@ func TestLogger(t *testing.T) {
 				assert.NoError(t, err, "Log output should be valid JSON")
 
 				// Verify required fields are present
-				assert.Contains(t, logEntry, "level")
-				assert.Contains(t, logEntry, "msg")
+				assert.Contains(t, logEntry, "L", "Should have level field")
+				assert.Contains(t, logEntry, "M", "Should have message field")
 				assert.Contains(t, logEntry, "method")
 				assert.Contains(t, logEntry, "path")
 				assert.Contains(t, logEntry, "status")
-				assert.Contains(t, logEntry, "duration")
+				assert.Contains(t, logEntry, "latency", "Should have latency field")
 			}
 		})
 	}

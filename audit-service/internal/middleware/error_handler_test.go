@@ -326,12 +326,16 @@ func TestHandleMethodNotAllowed(t *testing.T) {
 
 	// Setup router
 	router := gin.New()
+	// Register HandleMethodNotAllowed before adding routes
+	router.HandleMethodNotAllowed = true
+	router.NoMethod(HandleMethodNotAllowed())
+
+	// Define a route with GET method
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(200, gin.H{"success": true})
 	})
-	router.NoMethod(HandleMethodNotAllowed())
 
-	// Execute request with wrong method
+	// Execute request with wrong method (POST instead of GET)
 	req, _ := http.NewRequest("POST", "/test", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

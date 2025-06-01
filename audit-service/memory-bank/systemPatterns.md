@@ -449,32 +449,168 @@ test:
 	go test ./... -v
 
 test-coverage:
-	go test ./... -v -coverprofile=coverage.out
+	go test ./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 
-test-coverage-report:
-	go test ./... -v -coverprofile=coverage.out
-	go tool cover -func=coverage.out
-	@echo "Coverage threshold: 80%"
-
-test-integration:
-	go test ./tests/integration/... -v -tags=integration
-
-test-all: test test-integration
+generate-mocks:
+	mockery --all
 ```
 
-#### Quality Gates
+### 8.7 Middleware Testing Patterns
+
+#### Authentication Middleware Testing
 ```go
-// TestCoverageThreshold ensures minimum coverage
-func TestCoverageThreshold(t *testing.T) {
-    cmd := exec.Command("go", "test", "./...", "-coverprofile=coverage.out")
-    err := cmd.Run()
-    require.NoError(t, err)
-    
-    coverage := parseCoverageOutput("coverage.out")
-    assert.GreaterOrEqual(t, coverage, 80.0, 
-        "Test coverage below threshold: %.2f%% < 80%%", coverage)
+func TestAuth(t *testing.T) {
+    tests := []struct {
+        name           string
+        setupPath      string
+        setupRequest   func(*http.Request)
+        setupMocks     func(*mocks.MockTokenValidator, *mocks.MockAuditRepository, *cache.TokenCache)
+        expectedStatus int
+        expectedUserID string
+        expectedType   string
+    }{
+        {
+            name:      "success_jwt_token",
+            setupPath: "/sessions/test-session/history",
+            setupRequest: func(req *http.Request) {
+                req.Header.Set("Authorization", "Bearer valid-jwt-token")
+            },
+            setupMocks: func(mockValidator *mocks.MockTokenValidator, mockRepo *mocks.MockAuditRepository, tokenCache *cache.TokenCache) {
+                claims := createTestJWTClaims()
+                mockValidator.On("ValidateToken", mock.Anything, "valid-jwt-token").
+                    Return(claims, nil)
+            },
+            expectedStatus: 200,
+            expectedUserID: testUserID,
+            expectedType:   TokenTypeJWT,
+        },
+        // Additional test cases for share tokens, error scenarios
+    }
 }
 ```
+
+#### Bearer Token Extraction with Edge Cases
+```go
+func TestExtractBearerToken(t *testing.T) {
+    tests := []struct {
+        name          string
+        authHeader    string
+        expectedToken string
+    }{
+        {
+            name:          "extra_spaces",
+            authHeader:    "Bearer  token123", // Multiple spaces
+            expectedToken: "token123",
+        },
+        {
+            name:          "case_insensitive_bearer",
+            authHeader:    "bearer token123",
+            expectedToken: "token123",
+        },
+    }
+}
+
+// Implementation handles edge cases:
+func extractBearerToken(authHeader string) string {
+    authHeader = strings.TrimSpace(authHeader)
+    if len(authHeader) < 7 || strings.ToLower(authHeader[:6]) != "bearer" {
+        return ""
+    }
+    token := strings.TrimSpace(authHeader[6:])
+    if token == "" {
+        return ""
+    }
+    return token
+}
+```
+
+#### Error Handler Testing with Logging Verification
+```go
+func TestErrorHandler(t *testing.T) {
+    tests := []struct {
+        name           string
+        setupHandler   func(*gin.Context)
+        expectedStatus int
+        expectLogs     bool
+        expectedLogMsg string
+    }{
+        {
+            name: "logs_server_error_500",
+            setupHandler: func(c *gin.Context) {
+                c.JSON(500, domain.APIErrInternalServer)
+            },
+            expectedStatus: 500,
+            expectLogs:     true,
+            expectedLogMsg: "server error response",
+        },
+    }
+    
+    // Setup logger with buffer to capture logs
+    var logBuffer bytes.Buffer
+    encoder := zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig())
+    core := zapcore.NewCore(encoder, zapcore.AddSync(&logBuffer), zapcore.DebugLevel)
+    logger := zap.New(core)
+    
+    // Verify server errors are logged
+    if tt.expectLogs {
+        assert.Contains(t, logBuffer.String(), tt.expectedLogMsg)
+        assert.Contains(t, logBuffer.String(), fmt.Sprintf(`"status":%d`, tt.expectedStatus))
+    }
+}
+```
+
+#### Request ID Testing with Response Headers
+```go
+func TestRequestID(t *testing.T) {
+    // Test that checks response headers correctly
+    router.GET("/test", func(c *gin.Context) {
+        capturedRequestID = GetRequestID(c)
+        c.JSON(200, gin.H{"success": true})
+    })
+    
+    w := httptest.NewRecorder()
+    router.ServeHTTP(w, req)
+    
+    if tt.expectHeaderSet {
+        capturedHeaderID = w.Header().Get("X-Request-ID") // Check response header
+        assert.NotEmpty(t, capturedHeaderID)
+    }
+}
+```
+
+#### Method Not Allowed Testing Pattern
+```go
+func TestHandleMethodNotAllowed(t *testing.T) {
+    router := gin.New()
+    router.HandleMethodNotAllowed = true  // Enable 405 responses
+    router.NoMethod(HandleMethodNotAllowed())
+    
+    router.GET("/test", func(c *gin.Context) {
+        c.JSON(200, gin.H{"success": true})
+    })
+    
+    // POST to GET-only endpoint triggers 405
+    req, _ := http.NewRequest("POST", "/test", nil)
+    w := httptest.NewRecorder()
+    router.ServeHTTP(w, req)
+    
+    assert.Equal(t, 405, w.Code)
+}
+```
+
+## 9. Quality Assurance Patterns
+
+### Test Suite Organization
+- **Unit Tests**: Component isolation with mocks
+- **Integration Tests**: Real external dependencies
+- **End-to-End Tests**: Complete API workflows
+- **Performance Tests**: Load and stress testing
+
+### Continuous Testing
+- Pre-commit hooks run tests
+- CI pipeline runs full test suite
+- Coverage reports generated automatically
+- Quality gates prevent regression
 
 --- 

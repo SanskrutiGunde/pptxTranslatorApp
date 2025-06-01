@@ -14,10 +14,11 @@ func ErrorHandler(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
+		requestID := GetRequestID(c)
+
 		// Check if there are any errors
 		if len(c.Errors) > 0 {
 			err := c.Errors.Last()
-			requestID := GetRequestID(c)
 
 			// Log the error
 			logger.Error("request error",
@@ -35,6 +36,17 @@ func ErrorHandler(logger *zap.Logger) gin.HandlerFunc {
 			// Convert to API error
 			apiErr := domain.ToAPIError(err.Err)
 			c.JSON(apiErr.Status, apiErr)
+		} else {
+			// Log server errors even when no errors in c.Errors
+			status := c.Writer.Status()
+			if status >= 500 {
+				logger.Error("server error response",
+					zap.String("request_id", requestID),
+					zap.Int("status", status),
+					zap.String("path", c.Request.URL.Path),
+					zap.String("method", c.Request.Method),
+				)
+			}
 		}
 	}
 }
@@ -42,13 +54,13 @@ func ErrorHandler(logger *zap.Logger) gin.HandlerFunc {
 // HandleNotFound returns a handler for 404 errors
 func HandleNotFound() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, domain.NewAPIError("not_found", "Endpoint not found", http.StatusNotFound))
+		c.JSON(http.StatusNotFound, domain.NewAPIError("not_found", "The requested resource was not found", http.StatusNotFound))
 	}
 }
 
 // HandleMethodNotAllowed returns a handler for 405 errors
 func HandleMethodNotAllowed() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusMethodNotAllowed, domain.NewAPIError("method_not_allowed", "Method not allowed", http.StatusMethodNotAllowed))
+		c.JSON(http.StatusMethodNotAllowed, domain.NewAPIError("method_not_allowed", "HTTP method not allowed for this resource", http.StatusMethodNotAllowed))
 	}
 }

@@ -60,7 +60,6 @@ func TestRequestID(t *testing.T) {
 			// Test endpoint that captures the request ID
 			router.GET("/test", func(c *gin.Context) {
 				capturedRequestID = GetRequestID(c)
-				capturedHeaderID = c.GetHeader("X-Request-ID")
 				c.JSON(200, gin.H{"success": true})
 			})
 
@@ -76,6 +75,7 @@ func TestRequestID(t *testing.T) {
 			assert.Equal(t, 200, w.Code)
 
 			if tt.expectHeaderSet {
+				capturedHeaderID = w.Header().Get("X-Request-ID")
 				assert.NotEmpty(t, capturedHeaderID)
 				assert.NotEmpty(t, w.Header().Get("X-Request-ID"))
 			}

@@ -88,11 +88,23 @@ func Auth(validator jwt.TokenValidator, tokenCache *cache.TokenCache, repo repos
 
 // extractBearerToken extracts the token from the Bearer scheme
 func extractBearerToken(authHeader string) string {
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+	// Trim any leading/trailing whitespace
+	authHeader = strings.TrimSpace(authHeader)
+
+	// Check if it starts with "Bearer " (case-insensitive)
+	if len(authHeader) < 7 || strings.ToLower(authHeader[:6]) != "bearer" {
 		return ""
 	}
-	return parts[1]
+
+	// Extract everything after "Bearer " and trim spaces
+	token := strings.TrimSpace(authHeader[6:])
+
+	// Token should not be empty
+	if token == "" {
+		return ""
+	}
+
+	return token
 }
 
 // validateJWTToken validates a JWT token and caches the result

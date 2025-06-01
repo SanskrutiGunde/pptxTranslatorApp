@@ -12,63 +12,72 @@ type Config struct {
 	// Server configuration
 	Port     string `mapstructure:"PORT"`
 	LogLevel string `mapstructure:"LOG_LEVEL"`
-	
+
 	// Supabase configuration
 	SupabaseURL            string `mapstructure:"SUPABASE_URL"`
 	SupabaseAnonKey        string `mapstructure:"SUPABASE_ANON_KEY"`
 	SupabaseServiceRoleKey string `mapstructure:"SUPABASE_SERVICE_ROLE_KEY"`
 	SupabaseJWTSecret      string `mapstructure:"SUPABASE_JWT_SECRET"`
-	
+
 	// HTTP Client configuration
-	HTTPTimeout          time.Duration `mapstructure:"HTTP_TIMEOUT"`
-	HTTPMaxIdleConns     int           `mapstructure:"HTTP_MAX_IDLE_CONNS"`
-	HTTPMaxConnsPerHost  int           `mapstructure:"HTTP_MAX_CONNS_PER_HOST"`
-	HTTPIdleConnTimeout  time.Duration `mapstructure:"HTTP_IDLE_CONN_TIMEOUT"`
-	
+	HTTPTimeout         time.Duration `mapstructure:"HTTP_TIMEOUT"`
+	HTTPMaxIdleConns    int           `mapstructure:"HTTP_MAX_IDLE_CONNS"`
+	HTTPMaxConnsPerHost int           `mapstructure:"HTTP_MAX_CONNS_PER_HOST"`
+	HTTPIdleConnTimeout time.Duration `mapstructure:"HTTP_IDLE_CONN_TIMEOUT"`
+
 	// Cache configuration
-	CacheJWTTTL        time.Duration `mapstructure:"CACHE_JWT_TTL"`
-	CacheShareTokenTTL time.Duration `mapstructure:"CACHE_SHARE_TOKEN_TTL"`
+	CacheJWTTTL          time.Duration `mapstructure:"CACHE_JWT_TTL"`
+	CacheShareTokenTTL   time.Duration `mapstructure:"CACHE_SHARE_TOKEN_TTL"`
 	CacheCleanupInterval time.Duration `mapstructure:"CACHE_CLEANUP_INTERVAL"`
-	
+
 	// Application configuration
-	MaxPageSize      int `mapstructure:"MAX_PAGE_SIZE"`
-	DefaultPageSize  int `mapstructure:"DEFAULT_PAGE_SIZE"`
+	MaxPageSize     int `mapstructure:"MAX_PAGE_SIZE"`
+	DefaultPageSize int `mapstructure:"DEFAULT_PAGE_SIZE"`
 }
 
 // Load reads configuration from environment variables
 func Load() (*Config, error) {
+	// Configure viper to read from .env file
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("./")
+
+	// Read .env file if it exists (ignore error if file doesn't exist)
+	_ = viper.ReadInConfig()
+
 	// Set default values
 	viper.SetDefault("PORT", "4006")
 	viper.SetDefault("LOG_LEVEL", "info")
-	
+
 	// HTTP defaults
 	viper.SetDefault("HTTP_TIMEOUT", "30s")
 	viper.SetDefault("HTTP_MAX_IDLE_CONNS", 100)
 	viper.SetDefault("HTTP_MAX_CONNS_PER_HOST", 10)
 	viper.SetDefault("HTTP_IDLE_CONN_TIMEOUT", "90s")
-	
+
 	// Cache defaults
 	viper.SetDefault("CACHE_JWT_TTL", "5m")
 	viper.SetDefault("CACHE_SHARE_TOKEN_TTL", "1m")
 	viper.SetDefault("CACHE_CLEANUP_INTERVAL", "10m")
-	
+
 	// Pagination defaults
 	viper.SetDefault("MAX_PAGE_SIZE", 100)
 	viper.SetDefault("DEFAULT_PAGE_SIZE", 50)
-	
-	// Read from environment
+
+	// Read from environment (this will override .env file values)
 	viper.AutomaticEnv()
-	
+
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-	
+
 	// Validate required fields
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
-	
+
 	return &cfg, nil
 }
 
@@ -106,4 +115,4 @@ func (c *Config) GetSupabaseHeaders() map[string]string {
 		"Content-Type":  "application/json",
 		"Prefer":        "count=exact",
 	}
-} 
+}

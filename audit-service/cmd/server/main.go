@@ -1,5 +1,25 @@
 package main
 
+// @title Audit Service API
+// @version 1.0.0
+// @description A read-only microservice for accessing PowerPoint translation session audit logs
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:4006
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
 import (
 	"context"
 	"fmt"
@@ -10,6 +30,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "audit-service/docs" // Import generated docs
 	"audit-service/internal/config"
 	"audit-service/internal/handlers"
 	"audit-service/internal/middleware"
@@ -20,6 +41,8 @@ import (
 	"audit-service/pkg/logger"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 )
 
@@ -124,6 +147,9 @@ func setupRouter(
 
 	// Health check endpoint
 	router.GET("/health", handleHealth)
+
+	// API documentation
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")

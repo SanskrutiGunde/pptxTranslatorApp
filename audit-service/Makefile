@@ -22,7 +22,7 @@ help:
 	@echo "  make clean         - Clean build artifacts"
 
 # Build the binary
-build:
+build: docs
 	@echo "Building $(BINARY_NAME)..."
 	$(GO) build $(GOFLAGS) -ldflags="$(LDFLAGS)" -o bin/$(BINARY_NAME) cmd/server/main.go
 
